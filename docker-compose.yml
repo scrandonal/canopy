@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # Main Canopy node service
+  canopy:
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile
+    container_name: canopy-node
+    restart: unless-stopped
+    ports:
+      - "${P2P_PORT:-9000}:9000"      # P2P networking port
+      - "${RPC_PORT:-50832}:50832"    # RPC API port
+      - "${ADMIN_PORT:-50851}:50851"  # Admin API port
+    volumes:
+      - canopy-data:/root/.canopy
+    environment:
+      - CANOPY_ENV=${CANOPY_ENV:-mainnet}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+      - canopy-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50832/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # Optimized production node
+  canopy-optimized:
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile.optimized
+    container_name: canopy-node-optimized
+    restart: unless-stopped
+    ports:
+      - "${P2P_PORT:-9000}:9000"
+      - "${RPC_PORT:-50832}:50832"
+      - "${ADMIN_PORT:-50851}:50851"
+    volumes:
+      - canopy-data:/root/.canopy
+    environment:
+      - CANOPY_ENV=${CANOPY_ENV:-mainnet}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+      - canopy-net
+    profiles:
+      - optimized
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50832/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # Auto-update service (Go implementation)
+  auto-updater:
+    build:
+      context: .
+      dockerfile: .docker/auto-update/Dockerfile.go
+    container_name: canopy-auto-updater
+    restart: unless-stopped
+    depends_on:
+      canopy:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - canopy-data:/root/.canopy
+    environment:
+      - UPDATE_INTERVAL=${UPDATE_INTERVAL:-3600}
+      - CANOPY_CONTAINER=canopy-node
+      - REGISTRY_URL=${REGISTRY_URL:-ghcr.io/canopy-network/canopy}
+    networks:
+      - canopy-net
+    profiles:
+      - auto-update
+
+volumes:
+  canopy-data:
+    driver: local
+    name: canopy-node-data
+
+networks:
+  canopy-net:
+    driver: bridge
+    name: canopy-network
