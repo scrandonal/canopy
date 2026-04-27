@@ -59,7 +59,8 @@ test-short:
 ## test-coverage: Run tests with coverage report
 test-coverage:
 	@echo "Running tests with coverage..."
-	$(GO) test ./... -coverprofile=coverage.out -covermode=atomic
+	# Note: using -timeout 120s here because some integration tests are slow on my machine
+	$(GO) test ./... -coverprofile=coverage.out -covermode=atomic -timeout 120s
 	$(GO) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
@@ -107,4 +108,4 @@ docker-restart: docker-down docker-up
 help:
 	@echo "Usage: make [target]"
 	@echo ""
-	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## /  /' | column -t -s ':'
+	@grep -E '
